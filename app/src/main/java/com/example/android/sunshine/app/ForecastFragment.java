@@ -33,6 +33,8 @@ import java.util.List;
 
 public class ForecastFragment extends Fragment {
 
+    private ArrayAdapter<String> mForecastAdapter;
+
     public ForecastFragment() {
     }
 
@@ -52,13 +54,14 @@ public class ForecastFragment extends Fragment {
                 "Sat - Sunny - 76 / 68",
                 "Sun - Sunny - 80 / 68"
         };
+
         List<String> weekForecast = new ArrayList<>(Arrays.asList(forecastArray));
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(getActivity(),
+        mForecastAdapter = new ArrayAdapter<>(getActivity(),
                 R.layout.list_item_forecast, R.id.list_item_forecast_textview, weekForecast);
 
         ListView listView = (ListView) rootView.findViewById(R.id.listview_forecast);
-        listView.setAdapter(adapter);
+        listView.setAdapter(mForecastAdapter);
 
         return rootView;
     }
@@ -91,7 +94,6 @@ public class ForecastFragment extends Fragment {
         private final String LOG_TAG = FetchWeatherTask.class.getSimpleName();
 
 
-
         // Retorna a data atual em formato simples
         private String getReadableDateString(long time) {
             SimpleDateFormat shortenedDateFormat = new SimpleDateFormat("EEE MMM dd");
@@ -103,6 +105,16 @@ public class ForecastFragment extends Fragment {
             long roundedHigh = Math.round(high);
             long roundedLow = Math.round(low);
             return roundedHigh + " / " + roundedLow;
+        }
+
+        @Override
+        protected void onPostExecute(String[] result) {
+            if (result != null) {
+                mForecastAdapter.clear();
+                for(String dayForecastStr : result) {
+                    mForecastAdapter.add(dayForecastStr);
+                }
+            }
         }
 
         private String[] getWeatherDataFromJson(String forecastJsonStr, int numDays) throws JSONException {
@@ -185,17 +197,17 @@ public class ForecastFragment extends Fragment {
                 final String API_KEY = "appid";
 
 
-                Uri builttUri = Uri.parse(FORECAST_BASE_URL).buildUpon()
+                Uri builtUri = Uri.parse(FORECAST_BASE_URL).buildUpon()
                         .appendQueryParameter(QUERY_PARAM, params[0])
                         .appendQueryParameter(FORMAT_PARAM, format)
                         .appendQueryParameter(UNITS_PARAM, units)
                         .appendQueryParameter(DAYS_PARAM, Integer.toString(numDays))
                         .appendQueryParameter(API_KEY, key).build();
 
-                Log.v(LOG_TAG, "URI: " + builttUri);
+                Log.v(LOG_TAG, "URI: " + builtUri);
 
 
-                URL url = new URL(builttUri.toString());
+                URL url = new URL(builtUri.toString());
 
 
                 urlConnection = (HttpURLConnection) url.openConnection();
@@ -244,17 +256,16 @@ public class ForecastFragment extends Fragment {
                         Log.e(LOG_TAG, "Error ao fechar Stream", e);
                     }
                 }
-
             }
 
 
             try {
+                //mForecastAdapter.add(getWeatherDataFromJson(forecastJsonStr, numDays));
                return getWeatherDataFromJson(forecastJsonStr, numDays);
             } catch (JSONException e) {
                 Log.e(LOG_TAG, e.getMessage(), e);
                 e.printStackTrace();
             }
-
 
             return null;
         }
