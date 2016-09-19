@@ -12,5 +12,11 @@
     <string name="pref_location_label">Location</string>
     <string name="pref_location_key" translatable="false">location</string>
     <string name="pref_location_default" translatable="false">3448636</string>
+    <string name="pref_metrics_label">Unidade de temperatura</string>
+    <string name="pref_metrics_dialog_title">Escolha</string>
+    <string name="pref_metrics_key">metric</string>
+    <string name="pref_metrics_default">celsius</string>
+    <string name="action_map">Map Location</string>
+    <string name="action_share">Share</string>
 
 </resources>
