@@ -1,11 +1,13 @@
 package com.example.android.sunshine.app;
 
 import android.content.Intent;
-import android.content.SharedPreferences;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
-import android.util.Log;
+import android.support.v4.app.LoaderManager;
+import android.support.v4.content.CursorLoader;
+import android.support.v4.content.Loader;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -13,52 +15,55 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.ListView;
-import android.widget.Toast;
 
-import org.json.JSONException;
-import org.json.JSONObject;
+import com.example.android.sunshine.app.data.WeatherContract;
 
-import java.util.ArrayList;
 
-public class ForecastFragment extends Fragment {
+public class ForecastFragment extends Fragment implements LoaderManager.LoaderCallbacks<Cursor> {
 
-    private ArrayAdapter<String> mForecastAdapter;
+    private static final int FORECAST_LOADER = 0;
+
+    private static final String[] FORECAST_COLUMNS = {
+            // In this case the id needs to be fully qualified with a table name, since
+            // the content provider joins the location & weather tables in the background
+            // (both have an _id column)
+            // On the one hand, that's annoying.  On the other, you can search the weather table
+            // using the location set by the user, which is only in the Location table.
+            // So the convenience is worth it.
+            WeatherContract.WeatherEntry.TABLE_NAME + "." + WeatherContract.WeatherEntry._ID,
+            WeatherContract.WeatherEntry.COLUMN_DATE,
+            WeatherContract.WeatherEntry.COLUMN_SHORT_DESC,
+            WeatherContract.WeatherEntry.COLUMN_MAX_TEMP,
+            WeatherContract.WeatherEntry.COLUMN_MIN_TEMP,
+            WeatherContract.LocationEntry.COLUMN_LOCATION_SETTING,
+            WeatherContract.WeatherEntry.COLUMN_WEATHER_ID,
+            WeatherContract.LocationEntry.COLUMN_COORD_LAT,
+            WeatherContract.LocationEntry.COLUMN_COORD_LONG
+    };
+
+    // These indices are tied to FORECAST_COLUMNS.  If FORECAST_COLUMNS changes, these
+    // must change.
+    static final int COL_WEATHER_ID = 0;
+    static final int COL_WEATHER_DATE = 1;
+    static final int COL_WEATHER_DESC = 2;
+    static final int COL_WEATHER_MAX_TEMP = 3;
+    static final int COL_WEATHER_MIN_TEMP = 4;
+    static final int COL_LOCATION_SETTING = 5;
+    static final int COL_WEATHER_CONDITION_ID = 6;
+    static final int COL_COORD_LAT = 7;
+    static final int COL_COORD_LONG = 8;
+
+    private ForecastAdapter mForecastAdapter;
 
     public ForecastFragment() {
     }
 
     @Override
-    public void onStart() {
-        super.onStart();
-        updateWeather();
-    }
-
-    @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
-
-        View rootView = inflater.inflate(R.layout.fragment_main, container, false);
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        // Add this line in order for this fragment to handle menu events.
         setHasOptionsMenu(true);
-
-        mForecastAdapter = new ArrayAdapter<>(getActivity(),
-                R.layout.list_item_forecast, R.id.list_item_forecast_textview, new ArrayList());
-
-        ListView listView = (ListView) rootView.findViewById(R.id.listview_forecast);
-        listView.setAdapter(mForecastAdapter);
-
-        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> adapterView, View view, int position, long l) {
-                Toast.makeText(getActivity(), mForecastAdapter.getItem(position), Toast.LENGTH_SHORT).show();
-                Intent intent = new Intent(getActivity(), DetailActivity.class)
-                        .putExtra(Intent.EXTRA_TEXT, mForecastAdapter.getItem(position));
-                startActivity(intent);
-            }
-        });
-
-        return rootView;
     }
 
     @Override
@@ -68,54 +73,91 @@ public class ForecastFragment extends Fragment {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-
+        // Handle action bar item clicks here. The action bar will
+        // automatically handle clicks on the Home/Up button, so long
+        // as you specify a parent activity in AndroidManifest.xml.
         int id = item.getItemId();
-
-        if (id == R.id.action_settings) {
-            Toast.makeText(getActivity(), "teste", Toast.LENGTH_SHORT).show();
-            startActivity(new Intent(getActivity(), SettingsActivity.class));
+        if (id == R.id.action_refresh) {
+            updateWeather();
+            return true;
         }
-
         return super.onOptionsItemSelected(item);
     }
 
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        // The CursorAdapter will take data from our cursor and populate the ListView.
+        mForecastAdapter = new ForecastAdapter(getActivity(), null, 0);
 
+        View rootView = inflater.inflate(R.layout.fragment_main, container, false);
 
-    private String getLocationOnMap() {
+        // Get a reference to the ListView, and attach this adapter to it.
+        ListView listView = (ListView) rootView.findViewById(R.id.listview_forecast);
+        listView.setAdapter(mForecastAdapter);
 
-        final String OWM_CITY = "city";
-        final String OWM_COORD = "coord";
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
 
-        try {
-            JSONObject forecastJson = new JSONObject("{\"city\":{\"id\":3448636,\"name\":\"Sao Jose dos Campos\",\"coord\":{\"lon\":-45.88694,\"lat\":-23.17944},\"country\":\"BR\",\"population\":0},\"cod\":\"200\",\"message\":0.0535,\"cnt\":7,\"list\":[{\"dt\":1473948000,\"temp\":{\"day\":16,\"min\":11.64,\"max\":16,\"night\":11.64,\"eve\":16,\"morn\":16},\"pressure\":896.76,\"humidity\":75,\"weather\":[{\"id\":800,\"main\":\"Clear\",\"description\":\"clear sky\",\"icon\":\"01n\"}],\"speed\":1.61,\"deg\":146,\"clouds\":0},{\"dt\":1474034400,\"temp\":{\"day\":24.18,\"min\":10.12,\"max\":24.7,\"night\":11.54,\"eve\":21.08,\"morn\":10.12},\"pressure\":897.65,\"humidity\":49,\"weather\":[{\"id\":802,\"main\":\"Clouds\",\"description\":\"scattered clouds\",\"icon\":\"03d\"}],\"speed\":1.96,\"deg\":135,\"clouds\":32},{\"dt\":1474120800,\"temp\":{\"day\":27.6,\"min\":11.66,\"max\":27.6,\"night\":12.74,\"eve\":20.49,\"morn\":11.66},\"pressure\":897.63,\"humidity\":44,\"weather\":[{\"id\":500,\"main\":\"Rain\",\"description\":\"light rain\",\"icon\":\"10d\"}],\"speed\":3.86,\"deg\":331,\"clouds\":0,\"rain\":1.23},{\"dt\":1474207200,\"temp\":{\"day\":27,\"min\":14.91,\"max\":31.4,\"night\":19.76,\"eve\":31.4,\"morn\":14.91},\"pressure\":929.84,\"humidity\":0,\"weather\":[{\"id\":501,\"main\":\"Rain\",\"description\":\"moderate rain\",\"icon\":\"10d\"}],\"speed\":1.73,\"deg\":22,\"clouds\":0,\"rain\":10.01},{\"dt\":1474293600,\"temp\":{\"day\":22.85,\"min\":17.59,\"max\":24.05,\"night\":17.66,\"eve\":24.05,\"morn\":17.59},\"pressure\":928.53,\"humidity\":0,\"weather\":[{\"id\":501,\"main\":\"Rain\",\"description\":\"moderate rain\",\"icon\":\"10d\"}],\"speed\":1.17,\"deg\":348,\"clouds\":38,\"rain\":5.9},{\"dt\":1474380000,\"temp\":{\"day\":16.4,\"min\":12.34,\"max\":19.6,\"night\":12.34,\"eve\":19.6,\"morn\":15.66},\"pressure\":931.08,\"humidity\":0,\"weather\":[{\"id\":500,\"main\":\"Rain\",\"description\":\"light rain\",\"icon\":\"10d\"}],\"speed\":2,\"deg\":144,\"clouds\":90,\"rain\":1.93},{\"dt\":1474466400,\"temp\":{\"day\":14.96,\"min\":6.52,\"max\":20.07,\"night\":12.41,\"eve\":20.07,\"morn\":6.52},\"pressure\":933.59,\"humidity\":0,\"weather\":[{\"id\":500,\"main\":\"Rain\",\"description\":\"light rain\",\"icon\":\"10d\"}],\"speed\":1.48,\"deg\":168,\"clouds\":25,\"rain\":0.6}]}");
-            JSONObject cityJson = forecastJson.getJSONObject(OWM_CITY);
-            JSONObject coord = cityJson.getJSONObject(OWM_COORD);
+            @Override
+            public void onItemClick(AdapterView adapterView, View view, int position, long l) {
+                // CursorAdapter returns a cursor at the correct position for getItem(), or null
+                // if it cannot seek to that position.
+                Cursor cursor = (Cursor) adapterView.getItemAtPosition(position);
+                if (cursor != null) {
+                    String locationSetting = Utility.getPreferredLocation(getActivity());
+                    Intent intent = new Intent(getActivity(), DetailActivity.class)
+                            .setData(WeatherContract.WeatherEntry.buildWeatherLocationWithDate(
+                                    locationSetting, cursor.getLong(COL_WEATHER_DATE)
+                            ));
+                    startActivity(intent);
+                }
+            }
+        });
 
-            String longitude = coord.getString("lon");
-            String latitude = coord.getString("lat");
+        return rootView;
+    }
 
+    void onLocationChanged() {
+        updateWeather();
+        getLoaderManager().restartLoader(FORECAST_LOADER, null, this);
+    }
 
-            Log.v("MAPS URI:","geo:" + latitude + "," + longitude + "?z=14");
-            return "geo:" + latitude + "," + longitude + "?z=11";
-
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-        return "error";
-
+    @Override
+    public void onActivityCreated(Bundle savedInstanceState) {
+        getLoaderManager().initLoader(FORECAST_LOADER, null, this);
+        super.onActivityCreated(savedInstanceState);
     }
 
     private void updateWeather() {
-        Toast.makeText(getActivity(), "Atualizando", Toast.LENGTH_SHORT).show();
-        FetchWeatherTask fetchWeatherTask = new FetchWeatherTask(getActivity(), mForecastAdapter);
-
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
-        String cityId = prefs.getString(getString(R.string.pref_location_key), getString(R.string.pref_location_default));
-        fetchWeatherTask.execute(cityId);
+        FetchWeatherTask weatherTask = new FetchWeatherTask(getActivity());
+        String location = Utility.getPreferredLocation(getActivity());
+        weatherTask.execute(location);
     }
 
+    @Override
+    public Loader<Cursor> onCreateLoader(int i, Bundle bundle) {
+        String locationSetting = Utility.getPreferredLocation(getActivity());
 
+        // Sort order:  Ascending, by date.
+        String sortOrder = WeatherContract.WeatherEntry.COLUMN_DATE + " ASC";
+        Uri weatherForLocationUri = WeatherContract.WeatherEntry.buildWeatherLocationWithStartDate(
+                locationSetting, System.currentTimeMillis());
 
+        return new CursorLoader(getActivity(),
+                weatherForLocationUri,
+                FORECAST_COLUMNS,
+                null,
+                null,
+                sortOrder);
+    }
 
+    @Override
+    public void onLoadFinished(Loader<Cursor> cursorLoader, Cursor cursor) {
+        mForecastAdapter.swapCursor(cursor);
+    }
 
+    @Override
+    public void onLoaderReset(Loader<Cursor> cursorLoader) {
+        mForecastAdapter.swapCursor(null);
+    }
 }

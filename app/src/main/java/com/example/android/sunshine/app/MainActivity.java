@@ -1,24 +1,24 @@
 package com.example.android.sunshine.app;
 
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
 import android.support.v7.app.ActionBarActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.widget.Toast;
 
 
 public class MainActivity extends ActionBarActivity {
 
     private final String LOG_TAG = MainActivity.class.getSimpleName();
+    private final String FORECASTFRAGMENT_TAG = "FFTAG";
+    private String mLocation;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        mLocation = Utility.getPreferredLocation(this);
         setContentView(R.layout.activity_main);
         Log.v(LOG_TAG, "onCreate()");
         if (savedInstanceState == null) {
@@ -62,7 +62,15 @@ public class MainActivity extends ActionBarActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        Log.v(LOG_TAG, "onResume()");
+        String location = Utility.getPreferredLocation(this);
+        // update the location in our second pane using the fragment manager
+        if (location != null && !location.equals(mLocation)) {
+            ForecastFragment ff = (ForecastFragment) getSupportFragmentManager().findFragmentByTag(FORECASTFRAGMENT_TAG);
+            if (null != ff) {
+                ff.onLocationChanged();
+            }
+            mLocation = location;
+        }
     }
 
     @Override
@@ -84,15 +92,12 @@ public class MainActivity extends ActionBarActivity {
     }
 
     public void openPreferredLocationInMap() {
-        SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
-        String location = sharedPrefs.getString(
-                        "LOCATION_GPS",
-                "error");
 
-        Uri geoLocation = Uri.parse("geo:"+location+"?z=10").buildUpon().build();
+        String location = Utility.getPreferredLocation(this);
 
-
-         //"geo:" + latitude + "," + longitude + "?z=11";
+        Uri geoLocation = Uri.parse("geo:0,0?").buildUpon()
+                .appendQueryParameter("q", location)
+                .build();
 
 
 
@@ -102,13 +107,14 @@ public class MainActivity extends ActionBarActivity {
         if(intent.resolveActivity(getPackageManager()) != null){
             startActivity(intent);
         } else {
-            Toast.makeText(this, "Couldn't Call " + location + ", no receiving apps installed!", Toast.LENGTH_SHORT).show();
-            Log.d(LOG_TAG, "Couldn't Call " + location + ", no receiving apps installed!");
+            Log.d(LOG_TAG, "Couldn't call " + location + ", no receiving apps installed!");
 
         }
 
 
     }
+
+
 
 
 }
